@@ -1,0 +1,96 @@
+---
+title: "INF626L: Lab 1"
+author: "Jun Rao"
+date: "8/31/2019"
+output: word_document
+---
+# Task 1 (5 points)
+Power Function
+
+To make this a bit easier, assume x is a real number and y is an integer. Use a for-loop. Do not use the base (ˆ) function.
+
+```{r}
+power_func = function(x,y){
+  
+  result = 1
+  
+  for(i in 1:y){
+    result = result * x
+  }
+  
+  return(result)
+}
+
+# Test my function:
+x=2
+y=10
+
+power_func(x,y)
+
+```
+# Task 2 (10 points)
+Now, we’ll start to familiarize ourselves with using Stan.
+```{r}
+# Load the rstan package
+library(rstan)
+# Set some useful options
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+Now, I will alter the func_sim.stan file
+```{r}
+x=2
+y=10
+sim_data = list(x = x,y = y)
+sim_fit =
+  stan(file="fun.stan",
+  data=sim_data,
+  iter=1,
+  chains=1,
+  algorithm="Fixed_param")
+
+```
+
+
+```{r}
+# The function extract() will create a named list of output
+# Note that "lp__" is irrelevant here, but will become
+# very important later in the course.
+sim_out = extract(sim_fit)
+# View the structure of the sim_out object:
+str(sim_out)
+
+```
+```{r}
+# Call the value 'summation':
+sim_out$summation
+```
+
+```{r}
+# Compare with our example function in Task 1:
+power_func(x,y)
+```
+```{r}
+# Compare with R's base sum function
+x=2
+y=10
+x^y
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

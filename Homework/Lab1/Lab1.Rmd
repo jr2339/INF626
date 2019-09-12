@@ -1,0 +1,31 @@
+---
+title: "INF626L: Lab 1"
+author: "Jun Rao"
+date: "8/30/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+
+
+
+```{r}
+sum_func = function(y_vector){
+  
+  temp_real = 0
+  
+  for(i in 1:length(y_vector)){
+    temp_real = temp_real + y_vector[i]
+  }
+  
+  return(temp_real)
+}
+
+y_test = c(1, 2.1, 3, 4)
+
+
+sum_func(y_test)
+
+```
+
