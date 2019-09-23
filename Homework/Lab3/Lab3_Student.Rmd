@@ -1,0 +1,158 @@
+---
+title: "Lab 3"
+author: "Your Name"
+date: ''
+output:
+  pdf_document: 
+    fig_caption: yes
+header-includes:
+  \usepackage{float}
+  \floatplacement{figure}{H}
+  \usepackage{hyperref}
+  \hypersetup{
+    colorlinks=true,    
+    urlcolor=cyan
+  }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+```
+
+## The influence of priors and data on posteriors
+
+Remember, with Bayes' Rule, we know that: $P(\Theta | y) \propto P(\Theta) P(y | \Theta)$.
+
+# Task 1 (15 points)
+
+In lecture, we learned that when $X \sim Binomial(\theta, n)$, and $P(\theta)$ follows a beta distribution, then $P(\theta | x, n)$ also follows a beta distribution. 
+Said differently, the beta distribution is a conjugate prior for the binomial likelihood. 
+
+Your task is to demonstrate how the prior probability distribution of $\theta$ can influence the posterior estimate of $\theta$, specifically when we only have a single data observation ($x$) from a random variate ($X$) that we assume is binomially distributed. 
+
+Complete the following:
+
+\begin{enumerate}
+  \item Choose two prior distributions for $\theta$, both being beta distributions. In other words, choose two sets of $\alpha$'s and $\beta$'s to define your two prior distributions. Have one prior be ``vague'', and have one prior be strongly informative. (3 points)
+  \item For each prior, create a graphic that shows the prior distribution, the likelihood distribution, and the posterior estimate of $\theta$, structured like the example figure below. Note that the example figure will need to be altered (e.g., the x- and y-axis limits). (7 points)
+  \item Write a brief interpretation of your results. No more than 4 sentences. (5 points)
+\end{enumerate}
+
+\newpage
+
+Example figure structure. You will have to populate these figures with the correct objects and syntax. And you'll need one set of these figures per prior distribution. 
+```{r example-plot, fig.height=6.5, fig.width=2.5, fig.align='center'}
+
+# Create a multi-panel plot with three panels across three rows, and 1 column:
+par(mfrow = c(3, 1)) #c(n_rows,n_columns)
+
+plot(NA, NA,
+     xlim = c(0, 1), ylim = c(0, 5), #ylim are arbitrary here
+     xlab = expression(theta), ylab = expression("P("~theta~"|"~alpha~","~beta~")"))
+
+plot(NA, NA,
+     xlim = c(0, 1), ylim = c(0, 5), #ylim are arbitrary here
+     xlab = expression(theta), ylab = expression("P("~x~"|"~theta~","~n~")"))
+
+plot(NA, NA,
+     xlim = c(0, 1), ylim = c(0, 5), #ylim are arbitrary here
+     xlab = expression(theta), ylab = expression("P("~theta~"|"~x~","~n~")"))
+
+```
+
+\newpage
+
+I will walk you through this task, to a point. First, as in lecture, assume:
+```{r}
+x = 7
+n = 10
+```
+
+Here are some hints (as a reminder, don't break up the \texttt{enumerate} code block, or your document will not compile).
+\begin{enumerate}
+  \item Create a sequence of possible values for $\theta$.
+  \item Before you create your final figures, you can test how different shape parameters ($\alpha$ and $\beta$) affect the prior distribution of $\theta$, $P(\theta | \alpha, \beta)$. It may help to know that the mean of a beta distribution is $E[Y] = \frac{\alpha}{\alpha + \beta}$. Wikipedia also gives some easy examples to follow. 
+  \item Choose your two sets of beta distribution parameters.
+  \item For each set of beta parameters:
+  \begin{enumerate}
+      \item For each value of your $\theta$ sequence, calculate the log-prior probability, given your prior beta parameters. Store these log-prior probabilities in an object. In the PDF function, you can use the option \texttt{log = TRUE} to output the density value on the natural-log scale. \textbf{NOTE:} When you plot the PDF, transform back to standard density scale with the \texttt{exp()} function. 
+      \item For each value of your $\theta$ sequence, calculate the log-likelihood of observing $x = 7$, given that parameter value. Store these likelihood values in an object. Again use the option \texttt{log = TRUE}, but back-calculate to the original density scale when you plot. 
+      \item Because we know that the posterior of $\theta$, given our data, is a beta distribution, calculate the posterior distribution of $\theta$.
+      \item Plot the three distributions, similar to my example of a three-panel plot, above. 
+  \end{enumerate}
+  \item Write your interpretation of how the strength of prior influences your posterior. 
+\end{enumerate}
+
+
+
+\newpage
+# Task 2 (20 points)
+
+In lecture, we learned that when (1) $Y \sim Normal(\theta, \sigma^2)$, (2) $\sigma^2$ is known, (3) $\theta \sim Normal(\mu_0, \tau^{2}_{0})$, and (4) we have one data observation, $y$, then the posterior: 
+$$\theta | y, \sigma^2 
+\sim Normal \left(  \frac{ \frac{\mu_0}{\tau^{2}_{0}} + \frac{y}{\sigma^{2}} }{ \frac{1}{\tau^{2}_{0}} + \frac{1}{\sigma^{2}}},
+\frac{1}{\frac{1}{\tau^{2}_{0}} + \frac{1}{\sigma^{2}}} \right).$$
+
+This is with a single data point, but in most cases we have several data points. It can be shown that, when we have multiple data observations, such that $y$ is now a vector of $n$ data observations, then the posterior becomes:
+
+$$\theta | y, \sigma^2 
+\sim Normal \left(  \frac{ \frac{\mu_0}{\tau^{2}_{0}} + \frac{\bar{y}n}{\sigma^{2}} }{ \frac{1}{\tau^{2}_{0}} + \frac{n}{\sigma^{2}}},
+\frac{1}{\frac{1}{\tau^{2}_{0}} + \frac{n}{\sigma^{2}}} \right).$$
+
+Here $\bar{y}$ is the average of our data observations, and again, $n$ is the number of data observations. 
+
+In this task, we will show how the \textit{number of data points} can influence our likelihood, and therefore can influence our posterior, even with a fixed prior. First, assume:
+```{r}
+
+# Prior parameters on unknown mean (\theta):
+# Assume we know that the mean is "around 5"
+mu_0 = 5.0
+tau_0_sq = 9.0
+tau_0 = sqrt(tau_0_sq)
+
+# Known sigma_sq
+sigma_sq = 2.0
+sigma = sqrt(sigma_sq)
+
+# True mean of the random variate Y
+# This is what we need to estimate, but 
+# to simulate data, we have to assign it here
+mu_true = 3.0
+
+# Compare these two values of "n"
+# "n" is equal to the number of data observations
+n_compare = c(2, 75)
+
+```
+
+
+Complete the following:
+
+\begin{enumerate}
+  \item Simulate data from the ``true'' distribution of Y. You'll have two data sets, each with different numbers of data observations. See the code above for the number of data observations you should use in your comparison.
+  \item For each data set, create a graphic that shows the prior distribution, the likelihood distribution, and the posterior estimate of $\theta$, as in Task 1. (15 points, including the creation of your function, see below)
+  \item Write a brief interpretation of your results. Specifically, comment on how the number of data observations affects the posterior. No more than 4 sentences. (5 points)
+\end{enumerate}
+
+\newpage
+
+Here are some hints:
+
+\begin{enumerate}
+  \item Create a sequence of values for $\theta$ that could possibly result from the normal prior assumption (with the parameters of this normal prior defined in the code, above). For instance, -100 is not a likely value of $\theta$ $\dots$ 
+  \item For each value of $\theta$ in your sequence, calculate the prior density, on the log scale, and store these densities in an object. Remember that the prior distribution will not change between the two data sets.
+  \item Create a function to calculate the total likelihood of your data, given your parameters, $P(y | \theta, \sigma^2)$. The inputs should be your data vector and your parameters ($\theta$, $\sigma^2$, but remember $\sigma^2$ is fixed). The function should then output the log-likelihood of your data. Remember that on the log-scale, the total likelihood of your data is the \textit{sum of the likelihoods of each data point}. 
+  \item For each of your two data sets:
+  \begin{enumerate}
+      \item For each value of $\theta$ in your sequence, use the function you created to calculate the total log-likelihood of your data set. 
+      \item Now, you will have two vectors: (1) one vector that contains the log-prior density for each value of $\theta$ in your sequence, and (2) one vector that contains the total log-likelihood of your data set for each value of $\theta$ in your sequence. Therefore, these two vectors should be of the same size.
+      \item You can now calculate the log-posterior distribution of $\theta$ given your data. To do this, for each value of $\theta$ in your sequence, you will \textit{add} the log-prior and the log-likelihood. Thus, you will have a value of your posterior density for each value of $\theta$ in your sequence.
+      \item Create the three panel plot, as in Task 1. Remember to convert to the regular density scale using the \texttt{exp()} function. 
+  \end{enumerate}
+  \item Write your interpretaion. 
+\end{enumerate}
+
+  
+
+
+
