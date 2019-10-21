@@ -1,0 +1,249 @@
+---
+title: "Lab 5"
+author: "Your Name"
+date: ''
+output:
+  pdf_document: 
+    fig_caption: yes
+header-includes:
+  \usepackage{float}
+  \floatplacement{figure}{H}
+  \usepackage{hyperref}
+  \hypersetup{
+    colorlinks=true,    
+    urlcolor=cyan
+  }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+```
+
+# Linear Regression in R and Stan
+
+Today we are going to simulate data following the assumptions of linear regression, and we're going to conduct a Bayesian linear regression using Stan. 
+
+## Simulating the data
+
+Each time you run this code chunk, you'll come up with a new data set and a new linear relationship. However, each time you will still be following the assumptions of linear regression.
+
+```{r, fig.align='center', fig.height=4, fig.width=4}
+
+# Here are the required parameters:
+alpha = rnorm(1, 0, 50)
+beta = rnorm(1, 0, 50)
+sigma = abs(rcauchy(1, 0, 2.5))
+
+# We also need to know how many data points to generate:
+n_sample = 75
+
+# What are the values of our X variable?
+# Let's assume we're dealing with elevation, measured in meters:
+x_raw = runif(n_sample, 0, 3500)
+
+# Now center and standardize:
+x_mean = mean(x_raw)
+x_sd = sd(x_raw)
+
+x_scaled = (x_raw - x_mean) / (2 * x_sd)
+
+# Create our residuals:
+epsilon = rnorm(n_sample, 0, sigma)
+
+# Now we can finally create our data:
+y_hat = alpha + x_scaled * beta
+y_obs = y_hat + epsilon
+
+# A quick plot:
+plot(y_obs ~ x_scaled, type = "p", pch = 19, xlim = c(-1, 1))
+points(x = 0, y = alpha, pch = 19, col = "red")
+abline(v = 0, lty = 2)
+abline(h = alpha, lty = 2)
+abline(a = alpha, b = beta, lty = 1, col = "black")
+
+```
+
+## Set up the Stan analysis
+
+```{r message=FALSE, warning=FALSE}
+
+#--------------------------------------
+#--------------------------------------
+# Import/Load the rstan library:
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+#--------------------------------------
+#--------------------------------------
+
+# Specify the data inputs:
+
+
+stan_data = list(n_sample = n_sample,
+                 x_vec = x_scaled,
+                 y_vec = y_obs)
+
+# Now we have to specify which parameters to "monitor"
+# in the sampler.
+
+params_monitor = c("beta", "alpha", "sigma")
+
+# First, we will test whether our code compiles correctly:
+test_fit = 
+  stan(file = "LinReg.stan",
+       data = stan_data,
+       pars = params_monitor,
+       chains = 1, # How many chains to run
+       iter = 10, # How many iterations per chain
+       # Algorithm: No-U-Turn Sampler (NUTS)
+       # Variant of Hamiltonian Monte Carlo
+       algorithm="NUTS") 
+
+## Now we will run our full model:
+
+# How many samples do we want of each parameter, from each chain?
+n_mc_samples = 1000
+# How much burn-in?
+n_burn = 500
+# How much thinning? (take the ith value of the chain)
+n_thin = 3
+# Total iterations needed:
+n_iter_total = (n_mc_samples * n_thin) + n_burn
+
+model_fit =
+  stan(fit = test_fit, # So it knows we're already compiled
+       file = "LinReg.stan",
+       data = stan_data,
+       pars = params_monitor,
+       chains = 3,
+       warmup = n_burn,
+       thin = n_thin,
+       iter = n_iter_total, 
+       algorithm="NUTS")
+
+```
+
+## Check the output of the sampler
+
+```{r fig.align = 'center', fig.height=3.5, fig.width=8}
+
+model_out = rstan::extract(model_fit)
+str(model_out)
+
+# Traceplot with burn-in:
+rstan::traceplot(model_fit, pars = params_monitor, inc_warmup = TRUE)
+# Traceplot without burn-in:
+rstan::traceplot(model_fit, pars = params_monitor, inc_warmup = FALSE)
+
+# Summary Report:
+# Note the 2.5 and 97.5 quantiles give you the 95% credible interval
+# Are are "true" values within these bounds?
+# "lp__" represents log-posterior (the joint posterior), 
+#  up to a constant of proportionality
+summary(model_fit)$summary
+
+# Check Convergence:
+summary(model_fit)$summary[, "Rhat"]
+
+# Note that our n_eff < n_iter_total
+
+```
+
+\newpage 
+## Task 1 (5 points)
+
+For each parameter:
+
+1. Plot a histogram of the marginal posterior samples from the Stan output. 
+
+2. Use the \texttt{abline}() function to draw a vertical line that represents the \textbf{true} value of each parameter. 
+
+3. Think about what this tells you. 
+
+\newpage
+## The joint marginal
+
+```{r fig.align = 'center', fig.height=3.5, fig.width=4}
+
+# Plot the joint marginal samples of slope and intercept:
+
+beta_est = model_out$beta
+alpha_est = model_out$alpha
+sigma_est = model_out$sigma
+
+plot(beta_est ~ alpha_est, type = "p", pch = 19,
+     xlab = expression(hat(alpha)), ylab = expression(hat(beta)))
+points(x = median(alpha_est), y = median(beta_est), col = "red", pch = 19, cex = 2)
+# Does this match the true?
+points(x = alpha, y = beta, col = "blue", pch = 19, cex = 1.25)
+```
+
+## Visualizing the estimated model fit, with error
+
+```{r fig.align = 'center', fig.height=4, fig.width=4.5}
+
+plot(y_obs ~ x_scaled, type = "p", pch = 19, xlim = c(-1, 1))
+abline(v = 0, lty = 2)
+abline(h = alpha, lty = 2)
+
+# How many estimated lines to plot?
+n_lines = 100
+
+for(i in 1:n_lines){
+  this_sample = sample(c(1:length(alpha_est)), size = 1)
+  
+  alpha_temp = alpha_est[this_sample]
+  beta_temp = beta_est[this_sample]
+  
+  abline(a = alpha_temp, b = beta_temp, col = scales::alpha("gray", alpha = 0.2))
+  
+  
+}
+
+# Add the median estimate:
+abline(a = median(alpha_est), b = median(beta_est), col = "black")
+
+```
+
+
+## Predicting outcome ($\tilde{y}$) at unobserved values of input
+
+```{r fig.align = 'center', fig.height=4, fig.width=4.5}
+# A future observation of X, outside the original range of X (forecasting)
+x_future = 5000 
+# Scale it:
+x_future_scaled = (x_future - x_mean) / (2 * x_sd)
+
+# Now, generate possible values of unobserved y, given our observed y
+n_pred = 1000
+y_pred = NULL
+for(i in 1:n_pred){
+  
+  this_sample = sample(c(1:length(alpha_est)), size = 1)
+  
+  alpha_temp = alpha_est[this_sample]
+  beta_temp = beta_est[this_sample]
+  sigma_temp = sigma_est[this_sample]
+  
+  y_pred[i] = alpha_temp + beta_temp * x_future_scaled + rnorm(1, 0, sigma_temp)
+  
+}
+
+hist(y_pred, ylab = "Frequency", xlab = expression(tilde(y)), main = "")
+abline(v = median(y_pred), lty = 1, lwd = 2, col = "blue")
+abline(v = quantile(y_pred, probs = c(0.025, 0.975)), lty = 2, lwd = 2, col = "blue")
+
+```
+
+\newpage 
+## Task 2 (10 points)
+
+1. Re-code your data simulation so that you are not centering your input variable.
+
+2. Instead of standardizing by dividing by 2 standard deviations, standardize by dividing the input variable by 1000. 
+
+3. Re-run your Bayesian analysis on this new data set.
+
+4. Look at the number of effective samples in each chain. How does this compare to when you properly centered and scaled?
+
+5. Plot the joint marginal posterior samples of $\alpha$ and $\beta$. What differences do you observed compared to when we properly centered and scaled the input?

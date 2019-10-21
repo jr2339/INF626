@@ -1,0 +1,219 @@
+---
+title: "Lab 8"
+author: "Jun Rao"
+date: '10/21/2019'
+output:
+  word_document: default
+  pdf_document:
+    fig_caption: yes
+header-includes: \usepackage{float} \floatplacement{figure}{H} \usepackage{hyperref}
+  \hypersetup{ colorlinks=true, urlcolor=cyan }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+```
+
+```{r message=FALSE, warning=FALSE}
+#--------------------------------------
+#--------------------------------------
+# Import/Load the rstan library:
+library(tidyverse)
+library(rstan)
+library(loo)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+#--------------------------------------
+#--------------------------------------
+```
+
+
+# Random effects \& Simpson's paradox
+
+In this assignment, we will learn an important lesson about why accounting for group-level differences is essential in your analyses. I have provided you with a data set (\texttt{lab8\_data.csv}) that has one outcome variable, one input variable, and one group-level identifier. Note that the input variable has been centered and scaled for you. 
+
+## Your tasks (35 points)
+
+1. Import your data into R.
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+
+# Read in the .CSV file:
+df = read_csv("lab8_data.csv")
+
+#observations
+n_sample = nrow(df)
+
+#number of groups
+n_group = length(unique(df$group_idx))
+
+#y
+y = df$y_obs
+
+#x
+x = df$x_scaled
+
+#group_idx
+group_idx = df$group_idx
+
+head(df)
+```
+2. Create two scatterplots (5 points):
+
+(a) A scatterplot with \textbf{no} distinction between groups 
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+plot(x, y, main="y ~ x",xlab="x", ylab="y", pch=19)
+```
+
+(b) A scatterplot with data from specific groups that are clearly distinct 
+
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+ggplot(df, aes(x , y , color = factor(group_idx))) +
+  geom_point(shape = 19) 
+```
+
+
+
+
+
+
+
+3. Fit a linear regression with complete pooling (i.e., no distinction between groups). Write a brief interpretation about the linear relationship between the input and the outcome variable. In other words, interpret the slope parameter. (10 points) 
+```{r, message=FALSE, warning=FALSE}
+stan_data_1 = list(n_sample = n_sample,
+                 x_vec = x,
+                 y_vec = y)
+
+params_monitor = c("beta", "alpha", "sigma_resid", "log_lik")
+
+test_fit_1 = stan(file = "LinReg.stan",
+                data = stan_data_1,
+                pars = params_monitor,
+                chains = 1, # How many chains to run
+                iter = 10, # How many iterations per chain
+                algorithm="NUTS")
+
+## Now we will run our full model:
+# How many samples do we want of each parameter, from each chain?
+n_mc_samples = 1000
+# How much burn-in?
+n_burn = 500
+# How much thinning? (take the ith value of the chain)
+n_thin = 3
+# Total iterations needed:
+n_iter_total = (n_mc_samples * n_thin) + n_burn
+model_fit_1 =
+ stan(fit = test_fit_1, # So it knows we're already compiled
+      file = "LinReg.stan",
+      data = stan_data_1,
+      pars = params_monitor,
+      chains = 3,
+      warmup = n_burn,
+      thin = n_thin,
+      iter = n_iter_total,
+       algorithm="NUTS")
+model_out_1 = rstan::extract(model_fit_1)
+str(model_out_1)
+```
+
+```{r}
+#the 95% credible intervals
+beta_CI = c(summary(model_fit_1)$summary[1:1, "2.5%"],summary(model_fit_1)$summary[1:1, "97.5%"])
+beta_CI
+```
+The 95% credible intervals of beta which is the slope is between 4.527 and 5.857. It means 0 is not included in the 95% credible intervals. Hence, there is a linear relatiionship  between the input and the outcome variable.More details can see next graphic(Figuure1)
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+#draw the graphics for each group
+ggplot(df, aes(x, y)) +
+  ggtitle("Figure 1")+
+  geom_point(shape = 19) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  geom_vline(xintercept = 0, linetype = 2) +
+  theme_classic()
+```
+
+
+4. Fit a linear regression with partial pooling. Specifically, allow a random intercept per group. Again, write a brief interpretation about this linear regression. How has your conclusion changed compared to the outcome in Task 3? (10 points)
+```{r, message=FALSE, warning=FALSE}
+stan_data_2 = list(n_sample = n_sample,
+                 n_group = n_group,
+                 y_vec = y,
+                 x_vec = x,
+                 group_idx = group_idx)
+
+params_monitor = c("beta", "alpha_mean", "eta_alpha", "alpha_sigma", "sigma_resid", "log_lik")
+
+test_fit_2 = stan( file = "Intercepts_LinReg.stan",
+                 data = stan_data_2,
+                 pars = params_monitor,
+                 chains = 1,
+                 iter = 10,
+                 algorithm="NUTS")
+## Now we will run our full model:
+# How many samples do we want of each parameter, from each chain?
+n_mc_samples = 1000
+# How much burn-in?
+n_burn = 500
+# How much thinning? (take the ith value of the chain)
+n_thin = 3
+# Total iterations needed:
+n_iter_total = (n_mc_samples * n_thin) + n_burn
+model_fit_2 =
+stan(fit = test_fit_2, # So it knows we're already compiled
+     file = "Intercepts_LinReg.stan",
+     data = stan_data_2,
+     pars = params_monitor,
+     chains = 3,
+     warmup = n_burn,
+     thin = n_thin,
+     iter = n_iter_total,
+     algorithm="NUTS")
+model_out_2 = rstan::extract(model_fit_2)
+str(model_out_2)
+```
+```{r, message=FALSE, warning=FALSE}
+
+#summary(model_fit_2)$summary
+#first we visualize tabularly, the 95% CI for estimated parameters and compare these the the true values
+model_sum = summary(model_fit_2)$summary
+model_sum[c(1:9),c(4,6,8)]
+# we can see that few parameters were adequately recoverd. This included alpha_mean and all of the eta_alphas (9 of 12 params)
+```
+The 95% credible intervals of beta which is the slope is between -4.171 and -2.473. 
+For each group, it has differnent interception.
+In task 3, we can find that the slope for all the data is a positive number, however, when we analysis each single group, the slope is a negative number.
+From Figure 2, we can find it intuitively.
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+#draw the graphics for each group
+ggplot(df, aes(x, y, color = factor(group_idx))) +
+  ggtitle("Figure 2")+
+  geom_point(shape = 19) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.2) +
+  scale_color_brewer(palette = "Set1") +
+  geom_vline(xintercept = 0, linetype = 2) +
+  theme_classic()
+```
+
+5. Compare your two models using the LOO-IC. Which model provides a more parsimonious explanation of the data? Interpret what this means. (5 points)
+```{r, message=FALSE, warning=FALSE}
+# Calculate the LOO and WAIC for a single model:
+# Full model
+log_lik_1 = extract_log_lik(model_fit_1) 
+loo_1 = loo(log_lik_1)
+loo_1$estimates
+# reduced, intercept RE model
+log_lik_2 = extract_log_lik(model_fit_2) 
+loo_2 = loo(log_lik_2)
+loo_2$estimates
+# model comparison of loo
+loo::compare(loo_1, loo_2)
+```
+Based on the p_loo values for both model, the estimate 2.46 is lower than the intercept RE model.
+Additionally, the elpd_loo is lower but not significant because SE ranges overlap for both model estimate of elpd_loo.
+Therefore, we can conclude that the reduced model is more parsimonious because p_loo is still greater than the number of parameters.
+
+6. This assignment has shown an example of Simpson's Paradox. Look up this term and write a brief interpretation of how it applies to this assignment. What have you learned?  (5 points)
+
+Such as we described in the previous questions, we find that if we analysis all the data, the slope in the Figure 1 is postive, however, when we analysis by the group, the slope for each group is negative see Figure 2.
+
+

@@ -1,0 +1,99 @@
+---
+title: "Lab 6"
+author: "Your Name"
+date: ''
+output:
+  pdf_document: 
+    fig_caption: yes
+header-includes:
+  \usepackage{float}
+  \floatplacement{figure}{H}
+  \usepackage{hyperref}
+  \hypersetup{
+    colorlinks=true,    
+    urlcolor=cyan
+  }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos = 'h')
+```
+
+# Model selection in R and Stan 
+
+I have provided you with a data set in which you have measured outcome $y$ and you have measured two input variables $x1$ and $x2$. Your full, most complex linear model that we will consider is:
+$$y_i = \alpha + \beta_1 X_{1,i} + \beta_2 X_{2,i}$$
+Therefore, we will ignore any multiplicative interactions between the inputs. Importantly, remember from your previous statistics classes that we can condense linear regression into matrix notation: $y = \alpha + \mathbf{B} \mathbf{X}$, where $\mathbf{B}$ is a row-vector that holds the slopes and $\mathbf{X}$ is an input matrix of dimensions ($n \times d$), where $n$ is the number of data points and $d$ is the number of input variables. 
+
+## Task 1 (15 points)
+
+1. Import your data (code provided below), and then center and scale your input variables. Center by the mean and scale by 2$\times$standard deviation. This assignment will not work unless you do this step properly. Hint: You must center and scale the two $x$ variable columns separately (i.e., each variable will have its own mean and st. deviation). 
+
+2. Create two scatterplots of your outcome versus your two inputs. 
+
+3. Look at the provided Stan script, \texttt{Multi\_LinReg.stan}. Come to an understanding of the data inputs required to run this Stan model. Use the centered and scaled inputs to set up and run the Stan model, by adapting previously provided code. Hint: You will have to monitor the \texttt{log\_lik} parameter. 
+
+4. Show me that your model has converged. 
+
+5. What are the median and 95% credible intervals for each model parameter? 
+
+```{r, fig.align='center', fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+#--------------------------------------
+#--------------------------------------
+# You may need to install some of these packages
+library(tidyverse)
+library(rstan)
+library(loo)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+#--------------------------------------
+#--------------------------------------
+
+# Read in the .CSV file:
+data_raw = read_csv("lab6_data.csv")
+
+# Look at the contents of the data frame:
+glimpse(data_raw)
+
+```
+
+
+\newpage
+
+## Task 2 (30 points)
+
+1. Re-run your model two more times to store the nested model versions (e.g., with only input 1, and then with only input 2). Hint: You must store these models in objects with different names, however, you will not have to re-write the Stan model at all. Just think about how the inputs might change. 
+
+2. Use the \texttt{loo}() function to calculate the LOO-IC for each model. Follow my example code below, and make sure to store these into separate objects for each model run.
+```{r eval=FALSE}
+
+# Because eval = FALSE this code chunk will not run. 
+# You will have to input your correct objects into this function.
+
+# Calculate the LOO and WAIC for a single model:
+# I'm doing this for the 'full' or most complex model
+log_lik_full = extract_log_lik(model_full)
+
+loo_full = loo(log_lik_full)
+waic_full = waic(log_lik_full)
+
+loo_full
+waic_full
+
+```
+
+3. Use the \texttt{loo::compare}() function to compare all three of your nested models using the LOO-CV. Your code will look something like:
+```{r eval = FALSE}
+
+# Because eval = FALSE this code chunk will not run. 
+# You will have to input your correct objects into this function.
+
+loo::compare(loo_full, loo_sub1, loo_sub2)
+
+```
+
+4. Give a brief interpretation of your results of this statistical analysis and model comparison, citing the quantitative metrics as support for your conclusions. Remember your goal is to choose the most parsimonious model. 
+
+5. Show me visually and quantitatively that the variance of the posterior samples of $\beta_2$ from the most complex model is \textbf{larger} than the variance of the same estimate from the simpler model. The difference will be subtle, but you can imagine that if you had many input variables the effect would become compounded. 
+
+6. Look over the \texttt{Lab6\_Supplement.pdf} file and other associated files. There is no homework here, but this supplement will show you how to withhold data, run the Stan code on a training set, and use Stan to keep track of predictions for the withheld data. 
